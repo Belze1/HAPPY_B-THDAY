@@ -420,7 +420,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.toneMapping = THREE.ReinhardToneMapping; 
-            renderer.toneMappingExposure = 2.2; 
+            renderer.toneMappingExposure = 1.2; 
             container.appendChild(renderer.domElement);
 
             mainGroup = new THREE.Group();
@@ -436,24 +436,24 @@
         }
 
         function setupLights() {
-            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            const ambient = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambient);
 
-            const innerLight = new THREE.PointLight(0xffaa00, 2, 20);
+            const innerLight = new THREE.PointLight(0xffaa00, 0.5, 20);
             innerLight.position.set(0, 5, 0);
-            mainGroup.add(innerLight);
+            scene.add(innerLight);
 
-            const spotGold = new THREE.SpotLight(0xffcc66, 1200);
+            const spotGold = new THREE.SpotLight(0xffcc66, 80);
             spotGold.position.set(30, 40, 40);
             spotGold.angle = 0.5;
             spotGold.penumbra = 0.5;
             scene.add(spotGold);
 
-            const spotBlue = new THREE.SpotLight(0x6688ff, 600);
+            const spotBlue = new THREE.SpotLight(0x6688ff, 40);
             spotBlue.position.set(-30, 20, -30);
             scene.add(spotBlue);
             
-            const fill = new THREE.DirectionalLight(0xffeebb, 0.8);
+            const fill = new THREE.DirectionalLight(0xffeebb, 0.5);
             fill.position.set(0, 0, 50);
             scene.add(fill);
         }
@@ -461,8 +461,8 @@
         function setupPostProcessing() {
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.7; 
-            bloomPass.strength = 0.45; 
+            bloomPass.threshold = 0.9; 
+            bloomPass.strength = 0.4; 
             bloomPass.radius = 0.4;
 
             composer = new EffectComposer(renderer);
@@ -583,18 +583,14 @@
         
         // --- LOGIC TRÁI TIM 3D MỚI ---
         
-        // Công thức Parametric Heart (lấy từ wikipedia / Three.js examples)
+        // Công thức Parametric Heart (từ code gốc, không bị xoay ngược)
         function getHeartPoint(t, u, scale) {
             const a = 1; // Tham số kích thước
             const x = a * 16 * Math.pow(Math.sin(t), 3);
-            const y = a * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
             const z = a * u * 4; // Thêm chiều sâu Z
             
-            // Xoay quanh trục X để trái tim đứng thẳng
-            const rotateX = new THREE.Matrix4().makeRotationX(Math.PI);
-            
-            let pos = new THREE.Vector3(x, y + 10, z); // +10 để dịch chuyển lên giữa màn hình
-            pos.applyMatrix4(rotateX);
+            let pos = new THREE.Vector3(x, y, z);
             
             return pos.multiplyScalar(scale); 
         }
@@ -698,7 +694,6 @@
 
             mainGroup.add(heartGroup);
         }
-        // --- END LOGIC TRÁI TIM 3D MỚI ---
 
         // --- TIER PARTICLE CLASS (CHO BÁNH 3 TẦNG) ---
         class TierParticle {
@@ -817,16 +812,17 @@
                 }
             });
 
-            // Tạo các hình trụ cao nối giữa các vòng bánh (màu hồng như bánh)
+            // Tạo các hình trụ cao nối giữa các vòng bánh
             const cylMatBase = new THREE.MeshStandardMaterial({
-                color: CONFIG.colors.heartRed,
+                color: 0xFFF1D6,
                 transparent: true,
-                opacity: 0.9,
-                roughness: 0.85,
+                opacity: 0.2,
+                roughness: 0.7,
                 metalness: 0.0,
                 side: THREE.DoubleSide,
                 emissive: 0x000000,
-                emissiveIntensity: 0.0
+                emissiveIntensity: 0.0,
+                toneMapped: true
             });
 
             // Tạo cylinders nối giữa các tiers
@@ -845,6 +841,60 @@
                 cakeCylinderGroup.add(mesh);
                 cakeCylinders.push(mesh);
             });
+
+            // ============ THÊM TEXT "HAPPY BIRTHDAY" BÀNG KEM ============
+            const textString = "❤️ HAPPY BIRTHDAY JESSA ❤️";
+            const textLength = textString.length;
+            const radius = 7.5; // Bán kính đặt text
+            const centerY = -4.0; // Chiều cao giữa cylinder dưới cùng
+
+            // Group riêng để dễ control ẩn/hiện text
+            const textGroup = new THREE.Group();
+            cakeCylinderGroup.add(textGroup);
+
+            for (let i = 0; i < textLength; i++) {
+                const char = textString[i];
+                // Đảo hướng để text đúng chiều
+                const angle = -((i / textLength) * Math.PI * 2);
+
+                // Tạo canvas texture cho mỗi ký tự (to 3 lần)
+                const charCanvas = document.createElement('canvas');
+                charCanvas.width = 256;
+                charCanvas.height = 256;
+                const charCtx = charCanvas.getContext('2d');
+
+                charCtx.fillStyle = 'rgba(0, 0, 0, 0)';
+                charCtx.fillRect(0, 0, 256, 256);
+                charCtx.fillStyle = '#ff0000';
+                charCtx.font = 'bold 200px Arial';
+                charCtx.textAlign = 'center';
+                charCtx.textBaseline = 'middle';
+                charCtx.fillText(char, 128, 128);
+
+                const charTexture = new THREE.CanvasTexture(charCanvas);
+                const charMat = new THREE.MeshBasicMaterial({
+                    map: charTexture,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+
+                // Kích thước lớn hơn
+                const charGeo = new THREE.PlaneGeometry(2.4, 2.4);
+                const charMesh = new THREE.Mesh(charGeo, charMat);
+
+                // Đặt ký tự quanh hình trụ ở bề mặt bên
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                charMesh.position.set(x, centerY, z);
+
+                // Hướng ký tự về phía ngoài
+                charMesh.lookAt(0, centerY, 0);
+                // Xoay từng chữ 180 độ trái phải
+                charMesh.rotateY(Math.PI);
+
+                textGroup.add(charMesh);
+            }
+            // ============ HẾT THÊM TEXT ============
 
             // Thêm ảnh (nếu có) như trước
             mainGroup.add(photoMeshGroup);
@@ -974,9 +1024,16 @@
                 avgDist /= 4;
                 
                 // SỬA LOGIC CỬ CHỈ: Chụm ngón -> HEART
+                // CẬP NHẬT: Chụm ngón -> Phóng to ảnh (FOCUS)
                 if (pinchDist < 0.05) { 
-                    STATE.mode = 'HEART';
-                    STATE.focusTarget = null;
+                    if (STATE.mode !== 'FOCUS') { // Chỉ kích hoạt nếu chưa ở chế độ FOCUS
+                        STATE.mode = 'FOCUS';
+                        const photos = particleSystem.filter(p => p.type === 'PHOTO');
+                        if (photos.length) {
+                            STATE.focusTarget = photos[Math.floor(Math.random() * photos.length)].mesh;
+                        }
+                        console.log('Gesture: FOCUS');
+                    }
                 } else if (avgDist < 0.25) { 
                     STATE.mode = 'TREE';
                     STATE.focusTarget = null;
@@ -1102,13 +1159,13 @@
 
             // Rotation Logic
             if (STATE.mode === 'SCATTER' && STATE.hand.detected) {
-                const targetRotY = STATE.hand.x * Math.PI * 0.9; 
+                const targetRotY = -STATE.hand.x * Math.PI * 0.9; 
                 const targetRotX = STATE.hand.y * Math.PI * 0.25;
                 STATE.rotation.y += (targetRotY - STATE.rotation.y) * 3.0 * dt;
                 STATE.rotation.x += (targetRotX - STATE.rotation.x) * 3.0 * dt;
             } else {
                 if(STATE.mode === 'TREE') {
-                    STATE.rotation.y += 0.3 * dt;
+                    STATE.rotation.y -= 0.3 * dt;
                     STATE.rotation.x += (0 - STATE.rotation.x) * 2.0 * dt;
                 } else if (STATE.mode === 'HEART') { // Xoay chậm khi ở chế độ HEART
                     STATE.rotation.y += 0.5 * dt;
@@ -1122,10 +1179,11 @@
             mainGroup.rotation.y = STATE.rotation.y;
             mainGroup.rotation.x = STATE.rotation.x;
             
-            // --- CẬP NHẬT HẠT TRÁI TIM MỚI ---
+            // --- CẬP NHẬT HẠT TRÁI TIM ---
             heartParticles.forEach(p => p.update(dt, STATE.mode));
             // --- CẬP NHẬT BÁNH (3 TẦNG) ---
             cakeParticles.forEach(p => p.update(dt, STATE.mode));
+            
             // --- CẬP NHẬT CÁC HÌNH TRỤ TẦNG ---
             cakeCylinders.forEach(c => {
                 let targetOpacity = 0.9;
@@ -1143,7 +1201,30 @@
                     c.material.opacity = THREE.MathUtils.lerp(c.material.opacity, targetOpacity, 4.0 * dt);
                 }
             });
-            // ---------------------------------------------
+            
+            // === CẬP NHẬT TEXT HAPPY BIRTHDAY VÀ XỎI NÓ ===
+            const allCylinderChildren = Array.from(cakeCylinderGroup.children);
+            allCylinderChildren.forEach(child => {
+                if (child.children && child.children.length > 0) {
+                    const firstChild = child.children[0];
+                    // Kiểm tra xem đây có phải text group không
+                    if (firstChild.geometry && firstChild.geometry.type === 'PlaneGeometry') {
+                        // Xoay text group quanh trục Y
+                        child.rotation.y -= 0.3 * dt;
+                        
+                        // Ẩn/hiện text dựa trên mode
+                        child.children.forEach(charMesh => {
+                            let targetOpacity = 0.0;
+                            if (STATE.mode === 'TREE') {
+                                targetOpacity = 1.0;
+                            }
+                            if (charMesh.material && typeof charMesh.material.opacity === 'number') {
+                                charMesh.material.opacity = THREE.MathUtils.lerp(charMesh.material.opacity, targetOpacity, 4.0 * dt);
+                            }
+                        });
+                    }
+                }
+            });
 
             particleSystem.forEach(p => p.update(dt, STATE.mode, STATE.focusTarget));
             composer.render();
